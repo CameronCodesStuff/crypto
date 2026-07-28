@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PUMPDEV // TERMINAL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js"></script>
+<style>
+  :root{
+    --bg:#08080c;
+    --surface:#101018;
+    --surface-2:#161622;
+    --line:#22222f;
+    --text:#e6e6f0;
+    --muted:#6f6f85;
+    --green:#00ffa3;
+    --green-dim:#00ffa322;
+    --red:#ff3b6b;
+    --red-dim:#ff3b6b22;
+    --cyan:#00d9ff;
+    --mono:'JetBrains Mono', monospace;
+    --sans:'Inter', sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+    background-image:
+      radial-gradient(circle at 15% 0%, #00ffa314 0%, transparent 40%),
+      radial-gradient(circle at 85% 100%, #ff3b6b10 0%, transparent 40%);
+  }
+  a{color:inherit;}
+
+  /* ---------- header ---------- */
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 24px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, #0c0c14, #08080c);
+    position:sticky; top:0; z-index:20;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand .dot{
+    width:9px; height:9px; border-radius:50%;
+    background:var(--muted); flex-shrink:0;
+  }
+  .brand .dot.live{ background:var(--green); box-shadow:0 0 8px var(--green); animation:pulse 1.6s infinite; }
+  .brand .dot.down{ background:var(--red); box-shadow:0 0 8px var(--red); }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  .brand h1{
+    font-family:var(--mono); font-weight:800; font-size:18px; letter-spacing:1px;
+  }
+  .brand h1 span{ color:var(--green); }
+  .conn-label{ font-family:var(--mono); font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;}
+
+  #walletBtn{
+    font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:.5px;
+    background:var(--surface-2); color:var(--text);
+    border:1px solid var(--line); border-radius:8px;
+    padding:10px 16px; cursor:pointer; transition:.15s;
+  }
+  #walletBtn:hover{ border-color:var(--cyan); color:var(--cyan); }
+  #walletBtn.connected{ border-color:var(--green); color:var(--green); }
+
+  /* ---------- ticker tape (signature element) ---------- */
+  .ticker-wrap{
+    overflow:hidden; white-space:nowrap; border-bottom:1px solid var(--line);
+    background:#0c0c14;
+  }
+  .ticker{
+    display:inline-block; padding:8px 0;
+    animation:scroll 40s linear infinite;
+    font-family:var(--mono); font-size:12px;
+  }
+  .ticker-wrap:hover .ticker{ animation-play-state:paused; }
+  @keyframes scroll{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
+  .tick-item{ display:inline-block; padding:0 20px; color:var(--muted); }
+  .tick-item b{ color:var(--text); margin-right:6px; }
+  .tick-up{ color:var(--green); }
+  .tick-down{ color:var(--red); }
+
+  /* ---------- layout ---------- */
+  main{
+    display:grid;
+    grid-template-columns: 1fr 360px;
+    gap:1px;
+    background:var(--line);
+    min-height:calc(100vh - 106px);
+  }
+  @media (max-width:900px){ main{ grid-template-columns:1fr; } }
+
+  .panel{ background:var(--bg); padding:20px; }
+  .panel h2{
+    font-family:var(--mono); font-size:12px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--muted); margin-bottom:16px; display:flex; align-items:center; gap:8px;
+  }
+  .panel h2::after{ content:''; flex:1; height:1px; background:var(--line); }
+
+  /* feed table */
+  table{ width:100%; border-collapse:collapse; font-family:var(--mono); font-size:13px; }
+  thead th{
+    text-align:left; color:var(--muted); font-weight:500; font-size:11px;
+    text-transform:uppercase; letter-spacing:1px; padding:8px 10px; border-bottom:1px solid var(--line);
+  }
+  tbody tr{ cursor:pointer; transition:.1s; border-bottom:1px solid #16161f; }
+  tbody tr:hover{ background:var(--surface); }
+  tbody tr.selected{ background:var(--surface-2); box-shadow:inset 3px 0 0 var(--cyan); }
+  td{ padding:10px; }
+  .sym{ font-weight:700; }
+  .sym small{ color:var(--muted); font-weight:400; display:block; font-size:10px; }
+  .num.up{ color:var(--green); }
+  .num.down{ color:var(--red); }
+  .empty-feed{ color:var(--muted); font-family:var(--mono); font-size:13px; padding:40px 10px; text-align:center; }
+
+  /* trade panel */
+  .trade-panel{ background:var(--surface); border-left:1px solid var(--line); }
+  .selected-token{
+    background:var(--surface-2); border:1px solid var(--line); border-radius:10px;
+    padding:14px; margin-bottom:16px;
+  }
+  .selected-token .sym{ font-family:var(--mono); font-size:16px; }
+  .selected-token .price{ font-family:var(--mono); font-size:22px; font-weight:800; margin-top:4px; }
+  .placeholder{ color:var(--muted); font-family:var(--mono); font-size:12px; }
+
+  .side-toggle{ display:flex; gap:8px; margin-bottom:14px; }
+  .side-btn{
+    flex:1; padding:12px; text-align:center; font-family:var(--mono); font-weight:800;
+    border-radius:8px; cursor:pointer; border:1px solid var(--line); background:var(--surface-2);
+    color:var(--muted); letter-spacing:1px; transition:.15s;
+  }
+  .side-btn.buy.active{ background:var(--green-dim); border-color:var(--green); color:var(--green); }
+  .side-btn.sell.active{ background:var(--red-dim); border-color:var(--red); color:var(--red); }
+
+  label{ font-family:var(--mono); font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; display:block; margin:14px 0 6px; }
+  input[type=number]{
+    width:100%; background:var(--bg); border:1px solid var(--line); border-radius:8px;
+    padding:12px; color:var(--text); font-family:var(--mono); font-size:15px;
+  }
+  input[type=number]:focus{ outline:none; border-color:var(--cyan); }
+  .slip-row{ display:flex; gap:8px; margin-top:6px; }
+  .slip-chip{
+    font-family:var(--mono); font-size:11px; padding:6px 10px; border-radius:6px;
+    border:1px solid var(--line); background:var(--surface-2); color:var(--muted); cursor:pointer;
+  }
+  .slip-chip.active{ border-color:var(--cyan); color:var(--cyan); }
+
+  #executeBtn{
+    width:100%; margin-top:18px; padding:14px; border:none; border-radius:8px;
+    font-family:var(--mono); font-weight:800; font-size:14px; letter-spacing:1px; cursor:pointer;
+    background:var(--muted); color:#08080c;
+  }
+  #executeBtn.buy{ background:var(--green); }
+  #executeBtn.sell{ background:var(--red); }
+  #executeBtn:disabled{ background:var(--surface-2); color:var(--muted); cursor:not-allowed; }
+
+  .status-log{
+    margin-top:16px; font-family:var(--mono); font-size:11px; color:var(--muted);
+    background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px;
+    max-height:160px; overflow-y:auto;
+  }
+  .status-log div{ padding:2px 0; border-bottom:1px dashed #1a1a25; }
+  .status-log div.err{ color:var(--red); }
+  .status-log div.ok{ color:var(--green); }
+
+  .warn{
+    font-family:var(--mono); font-size:10.5px; color:var(--muted); margin-top:14px; line-height:1.5;
+    border-left:2px solid var(--line); padding-left:10px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="dot" id="wsDot"></span>
+    <h1>PUMPDEV<span>://</span>TERMINAL</h1>
+    <span class="conn-label" id="connLabel">connecting…</span>
+  </div>
+  <button id="walletBtn">Connect Wallet</button>
+</header>
+
+<div class="ticker-wrap">
+  <div class="ticker" id="ticker">
+    <span class="tick-item"><b>waiting for feed</b> connect the proxy URL below to go live</span>
+  </div>
+</div>
+
+<main>
+  <section class="panel">
+    <h2>Live Feed</h2>
+    <table>
+      <thead>
+        <tr><th>Token</th><th>Price</th><th>24h</th><th>Mcap</th></tr>
+      </thead>
+      <tbody id="feedBody">
+        <tr><td colspan="4" class="empty-feed">No data yet — waiting on WebSocket feed</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <aside class="panel trade-panel">
+    <h2>Execute</h2>
+
+    <div class="selected-token" id="selectedTokenBox">
+      <div class="placeholder">Select a token from the feed to trade</div>
+    </div>
+
+    <div class="side-toggle">
+      <div class="side-btn buy active" id="buySideBtn">BUY</div>
+      <div class="side-btn sell" id="sellSideBtn">SELL</div>
+    </div>
+
+    <label>Amount (SOL)</label>
+    <input type="number" id="amountInput" placeholder="0.00" min="0" step="0.001">
+
+    <label>Slippage</label>
+    <div class="slip-row">
+      <div class="slip-chip" data-v="0.5">0.5%</div>
+      <div class="slip-chip active" data-v="1">1%</div>
+      <div class="slip-chip" data-v="3">3%</div>
+      <div class="slip-chip" data-v="5">5%</div>
+    </div>
+
+    <button id="executeBtn" class="buy" disabled>Connect wallet to trade</button>
+
+    <div class="status-log" id="statusLog">
+      <div>Terminal ready. Waiting for wallet + feed…</div>
+    </div>
+
+    <div class="warn">
+      Swaps route through Jupiter's public aggregator and are signed locally
+      by your connected wallet. This sends real on-chain transactions —
+      double-check amount, slippage, and token before confirming. Nothing
+      here is financial advice.
+    </div>
+  </aside>
+</main>
+
+<script>
+/* ============================================================
+   CONFIG — set this to your deployed Cloudflare Worker URL.
+   Do NOT put the raw pumpdev.io key here; the worker hides it.
+   ============================================================ */
+const FEED_WS_URL = "wss://pumpdev-proxy.YOUR-SUBDOMAIN.workers.dev";
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+const JUP_QUOTE_API = "https://quote-api.jup.ag/v6/quote";
+const JUP_SWAP_API = "https://quote-api.jup.ag/v6/swap";
+const SOLANA_RPC = "https://api.mainnet-beta.solana.com";
+
+/* ---------------- state ---------------- */
+let ws = null;
+let tokens = new Map();      // mint -> {symbol, name, price, change24h, mcap}
+let selectedMint = null;
+let side = "buy";
+let slippageBps = 100;       // 1%
+let wallet = null;           // Phantom provider
+let publicKey = null;
+
+const $ = (id) => document.getElementById(id);
+const feedBody = $("feedBody");
+const ticker = $("ticker");
+const wsDot = $("wsDot");
+const connLabel = $("connLabel");
+const walletBtn = $("walletBtn");
+const executeBtn = $("executeBtn");
+const statusLog = $("statusLog");
+const selectedTokenBox = $("selectedTokenBox");
+
+function log(msg, cls) {
+  const d = document.createElement("div");
+  if (cls) d.className = cls;
+  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  statusLog.prepend(d);
+}
+
+/* ---------------- WebSocket feed ---------------- */
+function connectFeed() {
+  if (FEED_WS_URL.includes("YOUR-SUBDOMAIN")) {
+    connLabel.textContent = "proxy not configured";
+    log("Set FEED_WS_URL to your deployed Worker URL to go live.", "err");
+    return;
+  }
+  ws = new WebSocket(FEED_WS_URL);
+
+  ws.onopen = () => {
+    wsDot.className = "dot live";
+    connLabel.textContent = "live";
+    log("Connected to feed.", "ok");
+  };
+  ws.onclose = () => {
+    wsDot.className = "dot down";
+    connLabel.textContent = "disconnected — retrying…";
+    log("Feed disconnected, retrying in 3s.", "err");
+    setTimeout(connectFeed, 3000);
+  };
+  ws.onerror = () => { wsDot.className = "dot down"; };
+  ws.onmessage = (evt) => {
+    try {
+      const msg = JSON.parse(evt.data);
+      handleFeedMessage(msg);
+    } catch (e) { /* ignore non-JSON pings etc */ }
+  };
+}
+
+// NOTE: adjust this parser to match pumpdev.io's actual message schema —
+// this assumes a shape like { mint, symbol, name, price, change24h, mcap }.
+// Check pumpdev.io's docs and tweak the field names below if they differ.
+function handleFeedMessage(msg) {
+  const mint = msg.mint || msg.address || msg.id;
+  if (!mint) return;
+  tokens.set(mint, {
+    mint,
+    symbol: msg.symbol || "???",
+    name: msg.name || "",
+    price: Number(msg.price ?? msg.priceUsd ?? 0),
+    change24h: Number(msg.change24h ?? msg.priceChange24h ?? 0),
+    mcap: Number(msg.mcap ?? msg.marketCap ?? 0),
+  });
+  renderFeed();
+  renderTicker();
+  if (mint === selectedMint) renderSelectedToken();
+}
+
+function fmtPrice(p) {
+  if (!p) return "—";
+  if (p < 0.01) return "$" + p.toFixed(6);
+  return "$" + p.toFixed(4);
+}
+function fmtMcap(m) {
+  if (!m) return "—";
+  if (m > 1e6) return "$" + (m / 1e6).toFixed(2) + "M";
+  if (m > 1e3) return "$" + (m / 1e3).toFixed(1) + "K";
+  return "$" + m.toFixed(0);
+}
+
+function renderFeed() {
+  if (tokens.size === 0) return;
+  const rows = [...tokens.values()].slice(0, 60).map(t => {
+    const dir = t.change24h >= 0 ? "up" : "down";
+    return `<tr data-mint="${t.mint}" class="${t.mint === selectedMint ? 'selected' : ''}">
+      <td class="sym">${t.symbol}<small>${t.name}</small></td>
+      <td class="num">${fmtPrice(t.price)}</td>
+      <td class="num ${dir}">${t.change24h >= 0 ? '+' : ''}${t.change24h.toFixed(2)}%</td>
+      <td class="num">${fmtMcap(t.mcap)}</td>
+    </tr>`;
+  }).join("");
+  feedBody.innerHTML = rows;
+  feedBody.querySelectorAll("tr[data-mint]").forEach(row => {
+    row.addEventListener("click", () => selectToken(row.dataset.mint));
+  });
+}
+
+function renderTicker() {
+  const items = [...tokens.values()].slice(0, 30);
+  if (items.length === 0) return;
+  const html = items.map(t => {
+    const dir = t.change24h >= 0 ? "tick-up" : "tick-down";
+    return `<span class="tick-item"><b>${t.symbol}</b>${fmtPrice(t.price)} <span class="${dir}">${t.change24h >= 0 ? '+' : ''}${t.change24h.toFixed(1)}%</span></span>`;
+  }).join("");
+  ticker.innerHTML = html + html; // duplicate for seamless loop
+}
+
+function selectToken(mint) {
+  selectedMint = mint;
+  renderFeed();
+  renderSelectedToken();
+  updateExecuteState();
+}
+
+function renderSelectedToken() {
+  const t = tokens.get(selectedMint);
+  if (!t) return;
+  selectedTokenBox.innerHTML = `
+    <div class="sym">${t.symbol} <span class="placeholder">${t.name}</span></div>
+    <div class="price">${fmtPrice(t.price)}</div>
+  `;
+}
+
+/* ---------------- wallet ---------------- */
+async function connectWallet() {
+  const provider = window?.phantom?.solana || window.solana;
+  if (!provider || !provider.isPhantom) {
+    log("Phantom wallet not found. Install it from phantom.app.", "err");
+    window.open("https://phantom.app/", "_blank");
+    return;
+  }
+  try {
+    const resp = await provider.connect();
+    wallet = provider;
+    publicKey = resp.publicKey.toString();
+    walletBtn.textContent = publicKey.slice(0, 4) + "…" + publicKey.slice(-4);
+    walletBtn.classList.add("connected");
+    log(`Wallet connected: ${publicKey}`, "ok");
+    updateExecuteState();
+  } catch (e) {
+    log("Wallet connection rejected.", "err");
+  }
+}
+
+function updateExecuteState() {
+  if (!publicKey) {
+    executeBtn.disabled = true;
+    executeBtn.textContent = "Connect wallet to trade";
+    return;
+  }
+  if (!selectedMint) {
+    executeBtn.disabled = true;
+    executeBtn.textContent = "Select a token";
+    return;
+  }
+  executeBtn.disabled = false;
+  executeBtn.textContent = side === "buy" ? "Buy" : "Sell";
+}
+
+/* ---------------- side / slippage toggles ---------------- */
+$("buySideBtn").addEventListener("click", () => {
+  side = "buy";
+  $("buySideBtn").classList.add("active");
+  $("sellSideBtn").classList.remove("active");
+  executeBtn.className = "buy";
+  updateExecuteState();
+});
+$("sellSideBtn").addEventListener("click", () => {
+  side = "sell";
+  $("sellSideBtn").classList.add("active");
+  $("buySideBtn").classList.remove("active");
+  executeBtn.className = "sell";
+  updateExecuteState();
+});
+document.querySelectorAll(".slip-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".slip-chip").forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    slippageBps = Math.round(parseFloat(chip.dataset.v) * 100);
+  });
+});
+
+/* ---------------- trade execution via Jupiter ---------------- */
+async function executeTrade() {
+  const amount = parseFloat($("amountInput").value);
+  if (!amount || amount <= 0) { log("Enter an amount first.", "err"); return; }
+  if (!selectedMint || !publicKey) return;
+
+  const inputMint = side === "buy" ? SOL_MINT : selectedMint;
+  const outputMint = side === "buy" ? selectedMint : SOL_MINT;
+  const lamports = side === "buy"
+    ? Math.round(amount * 1e9)          // amount is in SOL
+    : Math.round(amount);                // for sells you'd pass token base units instead
+
+  executeBtn.disabled = true;
+  executeBtn.textContent = "Fetching quote…";
+
+  try {
+    const quoteUrl = `${JUP_QUOTE_API}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${lamports}&slippageBps=${slippageBps}`;
+    const quoteRes = await fetch(quoteUrl);
+    if (!quoteRes.ok) throw new Error("Quote request failed");
+    const quote = await quoteRes.json();
+    log(`Quote received: ${JSON.stringify(quote.outAmount || {})}`);
+
+    executeBtn.textContent = "Building transaction…";
+    const swapRes = await fetch(JUP_SWAP_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        quoteResponse: quote,
+        userPublicKey: publicKey,
+        wrapAndUnwrapSol: true,
+      }),
+    });
+    if (!swapRes.ok) throw new Error("Swap build failed");
+    const { swapTransaction } = await swapRes.json();
+
+    executeBtn.textContent = "Confirm in wallet…";
+    const txBuf = Uint8Array.from(atob(swapTransaction), c => c.charCodeAt(0));
+    const tx = solanaWeb3.VersionedTransaction.deserialize(txBuf);
+
+    const { signature } = await wallet.signAndSendTransaction(tx);
+    log(`Transaction sent: ${signature}`, "ok");
+    executeBtn.textContent = "Confirming…";
+
+    const connection = new solanaWeb3.Connection(SOLANA_RPC, "confirmed");
+    await connection.confirmTransaction(signature, "confirmed");
+    log(`Confirmed: ${signature}`, "ok");
+  } catch (e) {
+    log(`Trade failed: ${e.message}`, "err");
+  } finally {
+    updateExecuteState();
+  }
+}
+
+walletBtn.addEventListener("click", connectWallet);
+executeBtn.addEventListener("click", executeTrade);
+
+connectFeed();
+</script>
+</body>
+</html>
