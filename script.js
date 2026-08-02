@@ -2,7 +2,7 @@
    CONFIG — set this to your deployed Cloudflare Worker URL.
    Do NOT put the raw pumpdev.io key here; the worker hides it.
    ============================================================ */
-const FEED_WS_URL = "wss://crypto.detlaffcameron.workers.dev";
+const FEED_WS_URL = "https://crypto.detlaffcameron.workers.dev";
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const JUP_QUOTE_API = "https://quote-api.jup.ag/v6/quote";
 const JUP_SWAP_API = "https://quote-api.jup.ag/v6/swap";
